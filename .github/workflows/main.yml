@@ -14,7 +14,7 @@ jobs:
 
       - name: Deploy on server
         run: |
-          ssh -o StrictHostKeyChecking=no ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} << 'EOF'
+          ssh -o StrictHostKeyChecking=no -T ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} << 'EOF'
             set -e
             echo "🚀 Starting deployment for Landmark Cards App with PM2..."
 
@@ -28,9 +28,9 @@ jobs:
               echo "✅ Backup created at $BACKUP_DIR"
             fi
 
-            # Fetch new code from your repo
+            # Fetch new code from your repo using SSH URL
             rm -rf "$APP_DIR"
-            git clone https://github.com/sidhant7510/project-githubaction.git "$APP_DIR"
+            git clone git@github.com:sidhant7510/project-githubaction.git "$APP_DIR"
             cd "$APP_DIR"
 
             # Install dependencies (with legacy-peer-deps to fix TypeScript/react-scripts conflict)
@@ -85,9 +85,16 @@ jobs:
             # Restart app with PM2 (using server.js for the built app)
             echo "🚀 Restarting app with PM2..."
             pm2 delete myapp || true  # Clean up if exists
-            pm2 start server.js --name myapp
-            pm2 save  # Persist PM2 list
+            if [ -f server.js ]; then
+              pm2 start server.js --name myapp --no-autorestart || { echo "❌ PM2 start failed"; exit 1; }
+              pm2 save || { echo "❌ PM2 save failed"; exit 1; }
+              echo "✅ PM2 process restarted and saved"
+            else
+              echo "❌ server.js not found, deployment failed"
+              exit 1
+            fi
           EOF
+        shell: /usr/bin/bash -e {0}
 
   rollback:
     runs-on: ubuntu-latest
@@ -96,7 +103,7 @@ jobs:
     steps:
       - name: Rollback on server
         run: |
-          ssh -o StrictHostKeyChecking=no ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} << 'EOF'
+          ssh -o StrictHostKeyChecking=no -T ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} << 'EOF'
             echo "⚠️ Deployment failed. Rolling back to previous version..."
             APP_DIR="/var/www/html/myapp"
             BACKUP_DIR="/var/www/html/myapp_backup"
@@ -110,13 +117,14 @@ jobs:
               echo "🚀 Restarting rollback version with PM2..."
               pm2 delete myapp || true
               if [ -f server.js ]; then
-                pm2 start server.js --name myapp
+                pm2 start server.js --name myapp --no-autorestart || { echo "❌ PM2 rollback start failed"; exit 1; }
+                pm2 save || { echo "❌ PM2 save failed"; exit 1; }
               else
                 echo "⚠️ No server.js found in backup; manual restart needed"
               fi
-              pm2 save
             else
               echo "❌ No backup found. Manual recovery required!"
               exit 1
             fi
           EOF
+        shell: /usr/bin/bash -e {0}
