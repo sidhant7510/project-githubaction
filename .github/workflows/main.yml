@@ -2,7 +2,24 @@ name: CI
 
 ​on:
     push:
-        branches: [ main ]
+        branches: [ mastername: CI
+
+on:
+  push:
+    branches: [ master ]  # Updated to match the branch in the screenshot
+
+jobs:
+  deploy:
+    runs-on: self-hosted
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4  # Fetches your repository code
+
+      - name: Install dependencies
+        run: /root/.nvm/versions/node/v16.20.2/bin/npm i  # Installs Node.js dependencies
+
+      - name: Restart PM2 process
+        run: pm2 restart 1  # Restarts the PM2 process ID 1 ]
     
 jobs:
     deploy:
