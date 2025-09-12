@@ -1,0 +1,25 @@
+name: Test SSH and Create Directory
+
+on:
+  workflow_dispatch: # run manually from Actions tab
+
+jobs:
+  test-ssh:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H ${{ secrets.SERVER_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Connect to server and create directory
+        run: |
+          ssh ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} << 'EOF'
+            echo "✅ Connected to server successfully!"
+            mkdir -p /var/www/html/myapp
+            echo "📂 Created /var/www/html/myapp directory"
+            ls -ld /var/www/html/myapp
+          EOF
+
