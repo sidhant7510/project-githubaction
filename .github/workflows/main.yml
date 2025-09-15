@@ -38,11 +38,11 @@ jobs:
             cd "$APP_DIR"
 
             echo "📦 Installing dependencies..."
-            npm install --legacy-peer-deps
+            /home/ubuntu/.nvm/versions/node/v16.20.2/bin/npm install --legacy-peer-deps
 
             echo "🏗️ Building project..."
             if npm run | grep -q "build"; then
-              npm run build
+              /home/ubuntu/.nvm/versions/node/v16.20.2/bin/npm run build
             else
               echo "ℹ️ No build script found"
               mkdir -p build
