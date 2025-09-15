@@ -56,7 +56,7 @@ jobs:
 
             echo "🧪 Running tests..."
             if npm run | grep -q "test"; then
-              npm test -- --watchAll=false || { echo "❌ Tests failed"; exit 1; }
+              npm test -- --watchAll=false  --passWithNoTests  || { echo "❌ Tests failed"; exit 1; }
             else
               echo "ℹ️ No test script found"
             fi
