@@ -43,7 +43,7 @@ jobs:
 
             # Clone repo
             rm -rf "$APP_DIR"
-            git clone https://github.com/sidhant7510/project-githubaction.git "$APP_DIR"
+            git clone https://github.com/sidhant7510/project-githubaction "$APP_DIR"
             cd "$APP_DIR"
 
             echo "📦 Installing dependencies..."
@@ -51,7 +51,7 @@ jobs:
 
             echo "🏗️ Building project..."
             if npm run | grep -q "build"; then
-              npm run 
+              npm run build
             else
               echo "ℹ️ No build script found"
               mkdir -p build
