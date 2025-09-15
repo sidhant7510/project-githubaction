@@ -68,7 +68,7 @@ jobs:
             # Express server fallback
             if [ ! -f server.js ]; then
               echo "⚠️ Creating basic server.js..."
-              cat > server.js << 'SERVER_JS'
+              cat > server.js << 'EOF'
 const express = require('express');
 const path = require('path');
 const app = express();
@@ -83,7 +83,7 @@ app.get('/*', (req, res) => {
 });
 
 app.listen(PORT, () => console.log(`App running on port ${PORT}`));
-SERVER_JS
+EOF
             fi
 
             npm install express --legacy-peer-deps --save
