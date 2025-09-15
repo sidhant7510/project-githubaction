@@ -3,7 +3,7 @@ name: Deploy MyApp
 on:
   push:
     branches:
-      - master
+      - master   # ✅ use master instead of main
 
 jobs:
   deploy:
@@ -31,14 +31,14 @@ jobs:
             if [ ! -d "$APP_DIR/.git" ]; then
               echo "📥 Cloning fresh repository..."
               sudo rm -rf "$APP_DIR"
-              git clone ${{ secrets.REPO_URL }} "$APP_DIR"
+              git clone -b master ${{ secrets.REPO_URL }} "$APP_DIR"
             fi
 
             cd "$APP_DIR"
 
             echo "📦 Fetching latest code..."
-            git fetch origin main
-            git reset --hard origin/main
+            git fetch origin master
+            git reset --hard origin/master
 
             echo "📦 Installing dependencies..."
             npm install --legacy-peer-deps
