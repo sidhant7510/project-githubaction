@@ -1,100 +1,86 @@
 name: Deploy Node.js App with Auto Rollback (PM2)
 
 on:
-  workflow_dispatch:  # Allows manual trigger
+  workflow_dispatch:
   push:
-    branches: [ master ]  # Change to [ master ] if your default branch is master
+    branches: [ master ]
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4  # Updated to latest v4 for better performance
+        uses: actions/checkout@v4
 
       - name: Deploy on server
-        run: |
-          ssh -o StrictHostKeyChecking=no -T ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} << 'EOF'
-            set -e
-            echo "🚀 Starting deployment for Landmark Cards App with PM2..."
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          script_stop: true
+          script: |
+            echo "🚀 Starting deployment with PM2..."
 
             APP_DIR="/var/www/html/myapp"
             BACKUP_DIR="/var/www/html/myapp_backup"
 
-            # Backup current version
+            # Backup current app
             if [ -d "$APP_DIR" ]; then
               rm -rf "$BACKUP_DIR"
               cp -r "$APP_DIR" "$BACKUP_DIR" || { echo "❌ Backup failed"; exit 1; }
-              echo "✅ Backup created at $BACKUP_DIR"
+              echo "✅ Backup saved at $BACKUP_DIR"
             fi
 
-            # Fetch new code from your repo using SSH URL
+            # Clone repo
             rm -rf "$APP_DIR"
-            git clone git@github.com:sidhant7510/project-githubaction.git "$APP_DIR"
+            git clone https://github.com/sidhant7510/project-githubaction.git "$APP_DIR"
             cd "$APP_DIR"
 
-            # Install dependencies (with legacy-peer-deps to fix TypeScript/react-scripts conflict)
-            echo "📦 Installing Node.js dependencies..."
+            echo "📦 Installing dependencies..."
             npm install --legacy-peer-deps
 
-            # Build project (assumes React app builds to 'build/' folder)
-            echo "🏗️ Running build..."
+            echo "🏗️ Building project..."
             if npm run | grep -q "build"; then
               npm run build
             else
-              echo "ℹ️ No build script found, skipping build"
-              # Fallback: Create a basic build dir if no script
+              echo "ℹ️ No build script found"
               mkdir -p build
               cp -r . build/ || true
             fi
 
-            # Run tests (optional, for your conditional rendering logic)
             echo "🧪 Running tests..."
             if npm run | grep -q "test"; then
-              npm test -- --watchAll=false  # Run tests non-interactively
+              npm test -- --watchAll=false || { echo "❌ Tests failed"; exit 1; }
             else
-              echo "ℹ️ No test script found, skipping tests"
+              echo "ℹ️ No test script found"
             fi
 
-            # Simple Express server for static React build (create if not exists)
+            # Express server fallback
             if [ ! -f server.js ]; then
+              echo "⚠️ Creating basic server.js..."
               cat > server.js << 'SERVER_JS'
             const express = require('express');
             const path = require('path');
             const app = express();
             const PORT = process.env.PORT || 3000;
 
-            // Serve static files from build folder
             app.use(express.static(path.join(__dirname, 'build')));
-
-            // Handle React routing (send index.html for all requests)
             app.get('*', (req, res) => {
               res.sendFile(path.join(__dirname, 'build', 'index.html'));
             });
 
-            app.listen(PORT, () => {
-              console.log(`Landmark Cards App serving on port ${PORT}`);
-            });
+            app.listen(PORT, () => console.log(`App on port ${PORT}`));
             SERVER_JS
-              echo "✅ Created simple Express server for static build"
             fi
 
-            # Install Express if needed for the server
             npm install express --legacy-peer-deps --save
 
-            # Restart app with PM2 (using server.js for the built app)
             echo "🚀 Restarting app with PM2..."
-            pm2 delete myapp || true  # Clean up if exists
-            if [ -f server.js ]; then
-              pm2 start server.js --name myapp --no-autorestart || { echo "❌ PM2 start failed"; exit 1; }
-              pm2 save || { echo "❌ PM2 save failed"; exit 1; }
-              echo "✅ PM2 process restarted and saved"
-            else
-              echo "❌ server.js not found, deployment failed"
-              exit 1
-            fi
-          EOF
-        shell: /usr/bin/bash -e {0}
+            pm2 delete myapp || true
+            pm2 start server.js --name myapp
+            pm2 save
+            echo "✅ Deployment finished"
 
   rollback:
     runs-on: ubuntu-latest
@@ -102,29 +88,28 @@ jobs:
     if: failure()
     steps:
       - name: Rollback on server
-        run: |
-          ssh -o StrictHostKeyChecking=no -T ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} << 'EOF'
-            echo "⚠️ Deployment failed. Rolling back to previous version..."
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          script_stop: true
+          script: |
+            echo "⚠️ Deployment failed. Rolling back..."
             APP_DIR="/var/www/html/myapp"
             BACKUP_DIR="/var/www/html/myapp_backup"
 
             if [ -d "$BACKUP_DIR" ]; then
               rm -rf "$APP_DIR"
-              cp -r "$BACKUP_DIR" "$APP_DIR" || { echo "❌ Rollback copy failed"; exit 1; }
-              echo "✅ Rollback successful"
+              cp -r "$BACKUP_DIR" "$APP_DIR"
+              echo "✅ Rollback restored from $BACKUP_DIR"
 
               cd "$APP_DIR"
-              echo "🚀 Restarting rollback version with PM2..."
               pm2 delete myapp || true
-              if [ -f server.js ]; then
-                pm2 start server.js --name myapp --no-autorestart || { echo "❌ PM2 rollback start failed"; exit 1; }
-                pm2 save || { echo "❌ PM2 save failed"; exit 1; }
-              else
-                echo "⚠️ No server.js found in backup; manual restart needed"
-              fi
+              pm2 start server.js --name myapp
+              pm2 save
             else
-              echo "❌ No backup found. Manual recovery required!"
+              echo "❌ No backup found. Manual recovery needed."
               exit 1
             fi
-          EOF
-        shell: /usr/bin/bash -e {0}
+
