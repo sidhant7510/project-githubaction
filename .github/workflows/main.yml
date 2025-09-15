@@ -51,7 +51,7 @@ jobs:
 
             echo "🏗️ Building project..."
             if npm run | grep -q "build"; then
-              npm run build
+              npm run 
             else
               echo "ℹ️ No build script found"
               mkdir -p build
