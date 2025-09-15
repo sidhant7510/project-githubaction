@@ -25,10 +25,14 @@ jobs:
             APP_DIR="/var/www/html/myapp"
             BACKUP_DIR="/var/www/html/myapp_backup"
 
-            # Load NVM so node/npm are available
+            # Load NVM so node and npm are available
             export NVM_DIR="$HOME/.nvm"
             [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
             export PATH="$NVM_DIR/versions/node/v16.20.2/bin:$PATH"
+
+            # Ensure app directory exists
+            mkdir -p /var/www/html
+            sudo chown -R ubuntu:ubuntu /var/www/html
 
             # Backup current app
             if [ -d "$APP_DIR" ]; then
@@ -56,7 +60,7 @@ jobs:
 
             echo "🧪 Running tests..."
             if npm run | grep -q "test"; then
-              npm test -- --watchAll=false  --passWithNoTests  || { echo "❌ Tests failed"; exit 1; }
+              npm test -- --watchAll=false --passWithNoTests || { echo "❌ Tests failed"; exit 1; }
             else
               echo "ℹ️ No test script found"
             fi
@@ -65,18 +69,21 @@ jobs:
             if [ ! -f server.js ]; then
               echo "⚠️ Creating basic server.js..."
               cat > server.js << 'SERVER_JS'
-            const express = require('express');
-            const path = require('path');
-            const app = express();
-            const PORT = process.env.PORT || 3000;
+const express = require('express');
+const path = require('path');
+const app = express();
+const PORT = process.env.PORT || 3000;
 
-            app.use(express.static(path.join(__dirname, 'build')));
-            app.get('*', (req, res) => {
-              res.sendFile(path.join(__dirname, 'build', 'index.html'));
-            });
+// Serve static files from build folder
+app.use(express.static(path.join(__dirname, 'build')));
 
-            app.listen(PORT, () => console.log(`App on port ${PORT}`));
-            SERVER_JS
+// Serve index.html for all other routes
+app.get('/*', (req, res) => {
+  res.sendFile(path.join(__dirname, 'build', 'index.html'));
+});
+
+app.listen(PORT, () => console.log(`App running on port ${PORT}`));
+SERVER_JS
             fi
 
             npm install express --legacy-peer-deps --save
